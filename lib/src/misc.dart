@@ -32,3 +32,10 @@ String get scriptPath {
 }
 
 final pwd = Directory.current.path;
+
+final _cachedRegExps = <String, RegExp>{};
+
+RegExp getRegExp(String pattern) {
+  _cachedRegExps[pattern] ??= RegExp(pattern);
+  return _cachedRegExps[pattern]!;
+}
