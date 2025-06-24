@@ -10,6 +10,19 @@ final _lineTerminator = Platform.isWindows && env['SHELL'] != null
     ? '\n'
     : Platform.lineTerminator;
 
+(FileSystemEntity?, FileSystemEntityType) _resolve(Link link) {
+  final target = link.resolveSymbolicLinksSync();
+  final type = FileSystemEntity.typeSync(target);
+  if (type == FileSystemEntityType.file ||
+      type == FileSystemEntityType.notFound) {
+    return (File(target), type);
+  } else if (type == FileSystemEntityType.directory) {
+    return (Directory(target), type);
+  } else {
+    return (null, type);
+  }
+}
+
 extension Path on String {
   bool isDirectory() => FileSystemEntity.isDirectorySync(this);
 
@@ -34,14 +47,20 @@ extension Path on String {
     final type = FileSystemEntity.typeSync(this);
     switch (type) {
       case FileSystemEntityType.file:
+        File(this).copyTo(File(path), checked: true);
       case FileSystemEntityType.link:
-        File(this).copyTo(File(path));
+        final (target, type) = _resolve(Link(this));
+        if (target is File && type != FileSystemEntityType.notFound) {
+          target.copyTo(File(path), checked: true);
+        } else if (target is Directory) {
+          target.copyTo(Directory(path), checked: true);
+        }
       case FileSystemEntityType.directory:
-        Directory(this).copyTo(Directory(path));
+        Directory(this).copyTo(Directory(path), checked: true);
       case FileSystemEntityType.notFound:
         throw FileSystemException('File or directory not found', this);
       default:
-        throw UnimplementedError('Unsupported file system entity type: $type');
+        throw UnsupportedError('Unsupported file system entity type: $type');
     }
   }
 
@@ -66,7 +85,7 @@ extension Path on String {
       case FileSystemEntityType.notFound:
         throw FileSystemException('File or directory not found', this);
       default:
-        throw UnimplementedError('Unsupported file system entity type: $type');
+        throw UnsupportedError('Unsupported file system entity type: $type');
     }
   }
 
@@ -81,15 +100,15 @@ extension Path on String {
       case FileSystemEntityType.notFound:
         throw FileSystemException('File or directory not found', this);
       default:
-        throw UnimplementedError('Unsupported file system entity type: $type');
+        throw UnsupportedError('Unsupported file system entity type: $type');
     }
   }
 
   void write(String s, {bool clearFirst = false}) =>
       File(this).write(s, clearFirst: clearFirst);
 
-  void writeln(String s, {String? newLine, bool clearFirst = true}) =>
-      File(this).writeln(s, newLine: newLine, clearFirst: clearFirst);
+  void writeln(String s, {bool clearFirst = true}) =>
+      File(this).writeln(s, clearFirst: clearFirst);
 
   List<String> find(String glob) =>
       Directory(this).find(glob).map((e) => e.path).toList();
@@ -156,29 +175,40 @@ bool touch(String path) {
 
 File _getReal(File file) {
   final type = FileSystemEntity.typeSync(file.path);
-  final real = switch (type) {
-    FileSystemEntityType.directory => throw FileSystemException(
-      'Is a directory',
-      file.path,
-    ),
-    FileSystemEntityType.link => File(file.resolveSymbolicLinksSync()),
-    FileSystemEntityType.notFound || FileSystemEntityType.file => file,
-    _ => throw UnimplementedError('Unsupported file system entity type: $type'),
-  };
+  final File real;
+  switch (type) {
+    case FileSystemEntityType.directory:
+      throw FileSystemException('Is a directory', file.path);
+    case FileSystemEntityType.link:
+      final (resolved, type) = _resolve(Link(file.path));
+      if (resolved is File) {
+        real = resolved;
+      } else if (resolved is Directory) {
+        throw FileSystemException('Is a directory', file.path);
+      } else {
+        throw UnsupportedError('Unsupported file system entity type: $type');
+      }
+    case FileSystemEntityType.notFound || FileSystemEntityType.file:
+      real = file;
+    default:
+      throw UnsupportedError('Unsupported file system entity type: $type');
+  }
   real.parent.createSync(recursive: true);
   return real;
 }
 
 extension FileExt on File {
-  void copyTo(File file) {
-    final type = FileSystemEntity.typeSync(path);
-    if (type == FileSystemEntityType.notFound) {
-      throw FileSystemException('File not found', path);
-    } else if (type == FileSystemEntityType.directory) {
-      throw FileSystemException('Is a directory', path);
-    } else if (type != FileSystemEntityType.file &&
-        type != FileSystemEntityType.link) {
-      throw UnimplementedError('Unsupported file system entity type: $type');
+  void copyTo(File file, {bool checked = false}) {
+    if (!checked) {
+      final type = FileSystemEntity.typeSync(path);
+      if (type == FileSystemEntityType.notFound) {
+        throw FileSystemException('File not found', path);
+      } else if (type == FileSystemEntityType.directory) {
+        throw FileSystemException('Is a directory', path);
+      } else if (type != FileSystemEntityType.file &&
+          type != FileSystemEntityType.link) {
+        throw UnsupportedError('Unsupported file system entity type: $type');
+      }
     }
     copySync(_getReal(file).path);
   }
@@ -195,9 +225,9 @@ extension FileExt on File {
     );
   }
 
-  void writeln(String s, {String? newLine, bool clearFirst = false}) {
+  void writeln(String s, {bool clearFirst = false}) {
     _getReal(this).writeAsStringSync(
-      '$s${newLine ?? _lineTerminator}',
+      '$s$_lineTerminator',
       mode: clearFirst ? FileMode.write : FileMode.append,
       flush: true,
     );
@@ -219,34 +249,50 @@ void _copyDirectory(
     if (entity is File) {
       entity.copySync(newPath);
     } else if (entity is Link) {
-      final target = File(entity.resolveSymbolicLinksSync());
-      if (!isWithin(root.path, target.path) && !keepLinks) {
-        if (target.existsSync()) {
-          target.copySync(newPath);
-          return;
+      final resolved = entity.resolveSymbolicLinksSync();
+      final type = FileSystemEntity.typeSync(resolved);
+      if (!isWithin(root.path, resolved) && !keepLinks) {
+        if (type == FileSystemEntityType.file) {
+          File(resolved).copySync(newPath);
+        } else if (type == FileSystemEntityType.directory) {
+          _copyDirectory(
+            Directory(resolved),
+            Directory(newPath),
+            root,
+            keepLinks: keepLinks,
+          );
         }
+        return;
       }
-      var link = entity.targetSync();
-      if (isAbsolute(link) && isWithin(root.path, link)) {
-        link = absolute(join(destDir.path, relative(link, from: srcDir.path)));
+      var target = entity.targetSync();
+      if (isAbsolute(target) && isWithin(root.path, target)) {
+        target = absolute(
+          join(destDir.path, relative(target, from: srcDir.path)),
+        );
       }
-      Link(newPath).createSync(link);
+      Link(newPath).createSync(target);
     } else if (entity is Directory) {
-      _copyDirectory(entity, Directory(newPath), root);
+      _copyDirectory(entity, Directory(newPath), root, keepLinks: keepLinks);
     }
   });
 }
 
 extension DirectoryExt on Directory {
-  void copyTo(Directory directory, {bool keepLinks = true}) {
-    final type = FileSystemEntity.typeSync(path);
-    if (type == FileSystemEntityType.notFound) {
-      throw FileSystemException('Directory not found', path);
-    } else if (type == FileSystemEntityType.file ||
-        type == FileSystemEntityType.link) {
-      throw FileSystemException('Is a file', path);
-    } else if (type != FileSystemEntityType.directory) {
-      throw UnimplementedError('Unsupported file system entity type: $type');
+  void copyTo(
+    Directory directory, {
+    bool keepLinks = true,
+    bool checked = false,
+  }) {
+    if (!checked) {
+      final type = FileSystemEntity.typeSync(path);
+      if (type == FileSystemEntityType.notFound) {
+        throw FileSystemException('Directory not found', path);
+      } else if (type == FileSystemEntityType.file ||
+          type == FileSystemEntityType.link) {
+        throw FileSystemException('Is a file', path);
+      } else if (type != FileSystemEntityType.directory) {
+        throw UnsupportedError('Unsupported file system entity type: $type');
+      }
     }
     if (!FileSystemEntity.isDirectorySync(directory.path)) {
       throw FileSystemException('Is not a directory', directory.path);
