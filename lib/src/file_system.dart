@@ -106,7 +106,7 @@ extension Path on String {
   void write(String s, {bool clearFirst = false}) =>
       File(this).write(s, clearFirst: clearFirst);
 
-  void writeln(String s, {bool clearFirst = true}) =>
+  void writeln(String s, {bool clearFirst = false}) =>
       File(this).writeln(s, clearFirst: clearFirst);
 
   List<String> find(String glob) =>
