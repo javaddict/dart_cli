@@ -94,11 +94,10 @@ extension Path on String {
     switch (type) {
       case FileSystemEntityType.file:
       case FileSystemEntityType.link:
+      case FileSystemEntityType.notFound:
         File(this).clear();
       case FileSystemEntityType.directory:
         Directory(this).clear();
-      case FileSystemEntityType.notFound:
-        throw FileSystemException('File or directory not found', this);
       default:
         throw UnsupportedError('Unsupported file system entity type: $type');
     }
