@@ -74,6 +74,8 @@ extension CommandParts on List<String> {
       workingDirectory: at ?? _workingDirectory,
       environment: env._map1,
       runInShell: runInShell,
+      stdoutEncoding: runInShell ? systemEncoding : utf8,
+      stderrEncoding: runInShell ? systemEncoding : utf8,
     );
     if (!forceSilent) {
       if (showMessages && r.stdout != '') {
@@ -124,13 +126,13 @@ extension CommandParts on List<String> {
       (p.stderr, stderr, redirectMessages.$2, errBuf),
     ]) {
       final (src, std, redirect, buf) = e;
-      final decodedSrc = src
-          .transform(systemEncoding.decoder)
-          .transform(const LineSplitter());
+      final decodedSrc = src.transform(
+        runInShell ? systemEncoding.decoder : utf8.decoder,
+      );
       if (redirect == null && !saveMessages) {
         if (!forceSilent && showMessages) {
-          decodedSrc.listen((line) {
-            std.writeln(line);
+          decodedSrc.listen((s) {
+            std.write(s);
           });
         } else {
           decodedSrc.drain();
@@ -139,8 +141,8 @@ extension CommandParts on List<String> {
         var s0 = decodedSrc;
         if (!forceSilent && showMessages) {
           final [s00, s01] = StreamSplitter.splitFrom(s0);
-          s00.listen((line) {
-            std.writeln(line);
+          s00.listen((s) {
+            std.write(s);
           });
           s0 = s01;
         }
@@ -148,14 +150,14 @@ extension CommandParts on List<String> {
         if (redirect != null && saveMessages) {
           final [s10, s11] = StreamSplitter.splitFrom(s1);
           s10.pipe(redirect);
-          s11.listen((line) {
-            buf.writeln(line);
+          s11.listen((s) {
+            buf.write(s);
           });
         } else if (redirect != null) {
           s1.pipe(redirect);
         } else {
-          s1.listen((line) {
-            buf.writeln(line);
+          s1.listen((s) {
+            buf.write(s);
           });
         }
       }
