@@ -60,7 +60,7 @@ extension CommandParts on List<String> {
     String? at,
     bool showCommand = true,
     bool showMessages = true,
-    bool runInShell = true,
+    bool runInShell = false,
   }) {
     if (isEmpty) {
       throw ArgumentError('The command can not be empty.');
@@ -74,8 +74,6 @@ extension CommandParts on List<String> {
       workingDirectory: at ?? _workingDirectory,
       environment: env._map1,
       runInShell: runInShell,
-      stdoutEncoding: utf8,
-      stderrEncoding: utf8,
     );
     if (!forceSilent) {
       if (showMessages && r.stdout != '') {
@@ -99,7 +97,7 @@ extension CommandParts on List<String> {
       null,
       null,
     ),
-    bool runInShell = true,
+    bool runInShell = false,
     List<String> input = const [],
     bool interactive = false,
   }) async {
@@ -126,24 +124,27 @@ extension CommandParts on List<String> {
       (p.stderr, stderr, redirectMessages.$2, errBuf),
     ]) {
       final (src, std, redirect, buf) = e;
+      final decodedSrc = src
+          .transform(systemEncoding.decoder)
+          .transform(const LineSplitter());
       if (redirect == null && !saveMessages) {
         if (!forceSilent && showMessages) {
-          src.listen((data) {
-            std.add(data);
+          decodedSrc.listen((line) {
+            std.writeln(line);
           });
         } else {
-          src.drain();
+          decodedSrc.drain();
         }
       } else {
-        var s0 = src;
+        var s0 = decodedSrc;
         if (!forceSilent && showMessages) {
           final [s00, s01] = StreamSplitter.splitFrom(s0);
-          s00.listen((data) {
-            std.add(data);
+          s00.listen((line) {
+            std.writeln(line);
           });
           s0 = s01;
         }
-        final s1 = s0.transform(utf8.decoder).transform(const LineSplitter());
+        final s1 = s0;
         if (redirect != null && saveMessages) {
           final [s10, s11] = StreamSplitter.splitFrom(s1);
           s10.pipe(redirect);
@@ -244,31 +245,31 @@ extension Command on String {
       interactive: interactive,
     );
   }
-}
 
-List<String> separate(String command) {
-  final list = <String>[];
-  String? quote;
-  var i = 0;
-  int j;
-  for (j = 0; j < command.length; j++) {
-    final c = command[j];
-    if (c == '\\') {
-      j++;
-    } else if (quote == null && (c == '\'' || c == '"')) {
-      quote = c;
-    } else if (c == quote) {
-      quote = null;
-    } else if (c == ' ') {
-      if (quote == null) {
-        list.add(command.substring(i, j));
-        i = j + 1;
+  List<String> separate() {
+    final list = <String>[];
+    String? quote;
+    var i = 0;
+    int j;
+    for (j = 0; j < length; j++) {
+      final c = this[j];
+      if (c == '\\') {
+        j++;
+      } else if (quote == null && (c == '\'' || c == '"')) {
+        quote = c;
+      } else if (c == quote) {
+        quote = null;
+      } else if (c == ' ') {
+        if (quote == null) {
+          list.add(substring(i, j));
+          i = j + 1;
+        }
       }
     }
+    list.add(substring(i, j));
+    list.retainWhere((s) => s.isNotEmpty);
+    return list;
   }
-  list.add(command.substring(i, j));
-  list.retainWhere((s) => s.isNotEmpty);
-  return list;
 }
 
 final _lineTerminatorRegExp = RegExp('(?:\n|\r\n)');
