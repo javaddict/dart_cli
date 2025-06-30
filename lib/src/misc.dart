@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:path/path.dart';
+import 'package:uuid/uuid.dart';
 
 import 'file_system.dart';
 import 'process.dart';
@@ -38,4 +39,39 @@ final _cachedRegExps = <String, RegExp>{};
 RegExp getRegExp(String pattern) {
   _cachedRegExps[pattern] ??= RegExp(pattern);
   return _cachedRegExps[pattern]!;
+}
+
+final _uuid = Uuid();
+final _tempFiles = <String>[];
+bool _terminationHandlerRegistered = false;
+
+String createTempFile({String? suffix}) {
+  final f =
+      '${join(Directory.systemTemp.path, _uuid.v4())}${suffix != null && suffix[0] != '.' ? '.' : ''}${suffix ?? ''}';
+  _tempFiles.add(f);
+  f.create();
+
+  if (!_terminationHandlerRegistered) {
+    // Handle Ctrl+C gracefully
+    ProcessSignal.sigint.watch().listen((_) {
+      deleteTempFiles();
+      exit(0);
+    });
+
+    // Handle termination requests (Unix/Linux/macOS only)
+    if (!Platform.isWindows) {
+      ProcessSignal.sigterm.watch().listen((_) {
+        deleteTempFiles();
+        exit(0);
+      });
+    }
+    _terminationHandlerRegistered = true;
+  }
+
+  return f;
+}
+
+void deleteTempFiles() {
+  _tempFiles.forEach(delete);
+  _tempFiles.clear();
 }
