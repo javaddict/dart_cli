@@ -243,7 +243,7 @@ extension FileExt on File {
     final isClosed = _sinksClosed[real] ?? false;
 
     if (sink == null || isClosed) {
-      sink = real.openWrite();
+      sink = real.openWrite(mode: FileMode.append);
       _sinks[real] = sink;
       _sinksClosed[real] = false;
 
