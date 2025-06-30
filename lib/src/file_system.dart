@@ -112,6 +112,8 @@ extension Path on String {
   List<String> find(String glob) =>
       Directory(this).find(glob).map((e) => e.path).toList();
 
+  IOSink get out => File(this).out;
+
   bool touch() {
     final file = File(this);
     if (Platform.isWindows) {
@@ -196,6 +198,8 @@ File _getReal(File file) {
   return real;
 }
 
+final _sinks = Expando<IOSink>();
+
 extension FileExt on File {
   void copyTo(File file, {bool checked = false}) {
     if (!checked) {
@@ -231,6 +235,8 @@ extension FileExt on File {
       flush: true,
     );
   }
+
+  IOSink get out => _sinks[_getReal(this)] ??= openWrite();
 }
 
 void _copyDirectory(
