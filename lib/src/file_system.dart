@@ -199,6 +199,7 @@ File _getReal(File file) {
 }
 
 final _sinks = Expando<IOSink>();
+final _sinksClosed = Expando<bool>();
 
 extension FileExt on File {
   void copyTo(File file, {bool checked = false}) {
@@ -236,7 +237,22 @@ extension FileExt on File {
     );
   }
 
-  IOSink get out => _sinks[_getReal(this)] ??= openWrite();
+  IOSink get out {
+    final real = _getReal(this);
+    var sink = _sinks[real];
+    final isClosed = _sinksClosed[real] ?? false;
+
+    if (sink == null || isClosed) {
+      sink = real.openWrite();
+      _sinks[real] = sink;
+      _sinksClosed[real] = false;
+
+      // Track when sink is closed
+      sink.done.then((_) => _sinksClosed[real] = true);
+    }
+
+    return sink;
+  }
 }
 
 void _copyDirectory(
