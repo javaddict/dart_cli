@@ -282,14 +282,12 @@ extension ProcessResultExt on ProcessResult {
       return [];
     }
     final s = this.stdout as String;
-    return s.isEmpty ? [] : s.split(_lineTerminatorRegExp)
-      ..removeLast();
+    return s.isEmpty ? [] : (s.split(_lineTerminatorRegExp)..removeLast());
   }
 
   List<String> get errors {
     final s = this.stderr as String;
-    return s.isEmpty ? [] : s.split(_lineTerminatorRegExp)
-      ..removeLast();
+    return s.isEmpty ? [] : (s.split(_lineTerminatorRegExp)..removeLast());
   }
 
   String get output {
