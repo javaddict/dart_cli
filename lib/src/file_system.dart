@@ -198,8 +198,8 @@ File _getReal(File file) {
   return real;
 }
 
-final _sinks = Expando<IOSink>();
-final _sinksClosed = Expando<bool>();
+final Map<String, IOSink> _sinks = {};
+final Map<String, bool> _sinksClosed = {};
 
 extension FileExt on File {
   void copyTo(File file, {bool checked = false}) {
@@ -238,17 +238,18 @@ extension FileExt on File {
   }
 
   IOSink get out {
-    final real = _getReal(this);
-    var sink = _sinks[real];
-    final isClosed = _sinksClosed[real] ?? false;
+    final file = _getReal(this);
+    final path = absolute(file.path);
+    var sink = _sinks[path];
+    final isClosed = _sinksClosed[path] ?? false;
 
     if (sink == null || isClosed) {
-      sink = real.openWrite(mode: FileMode.append);
-      _sinks[real] = sink;
-      _sinksClosed[real] = false;
+      sink = file.openWrite(mode: FileMode.append);
+      _sinks[path] = sink;
+      _sinksClosed[path] = false;
 
       // Track when sink is closed
-      sink.done.then((_) => _sinksClosed[real] = true);
+      sink.done.then((_) => _sinksClosed[path] = true);
     }
 
     return sink;
