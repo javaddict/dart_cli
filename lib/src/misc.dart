@@ -43,31 +43,12 @@ RegExp getRegExp(String pattern) {
 
 final _uuid = Uuid();
 final _tempFiles = <String>[];
-bool _terminationHandlerRegistered = false;
 
 String createTempFile({String? suffix}) {
   final f =
       '${join(Directory.systemTemp.path, _uuid.v4())}${suffix != null && suffix[0] != '.' ? '.' : ''}${suffix ?? ''}';
   _tempFiles.add(f);
   f.create();
-
-  if (!_terminationHandlerRegistered) {
-    // Handle Ctrl+C gracefully
-    ProcessSignal.sigint.watch().listen((_) {
-      deleteTempFiles();
-      exit(0);
-    });
-
-    // Handle termination requests (Unix/Linux/macOS only)
-    if (!Platform.isWindows) {
-      ProcessSignal.sigterm.watch().listen((_) {
-        deleteTempFiles();
-        exit(0);
-      });
-    }
-    _terminationHandlerRegistered = true;
-  }
-
   return f;
 }
 
