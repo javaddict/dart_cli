@@ -281,12 +281,18 @@ extension ProcessResultExt on ProcessResult {
     if (this.stdout == null) {
       return [];
     }
-    final s = this.stdout as String;
+    var s = this.stdout as String;
+    if (s.endsWith('\n')) {
+      s = s.substring(0, s.length - 1);
+    }
     return s.isEmpty ? [] : (s.split(_lineTerminatorRegExp));
   }
 
   List<String> get errors {
-    final s = this.stderr as String;
+    var s = this.stderr as String;
+    if (s.endsWith('\n')) {
+      s = s.substring(0, s.length - 1);
+    }
     return s.isEmpty ? [] : (s.split(_lineTerminatorRegExp));
   }
 
