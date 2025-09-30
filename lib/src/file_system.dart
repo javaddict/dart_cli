@@ -103,16 +103,18 @@ extension Path on String {
     }
   }
 
-  void write(String s, {bool clearFirst = false}) =>
-      File(this).write(s, clearFirst: clearFirst);
+  void write(String s, {bool clearFirst = false, bool flush = false}) =>
+      File(this).write(s, clearFirst: clearFirst, flush: flush);
 
-  void writeln(String s, {bool clearFirst = false}) =>
-      File(this).writeln(s, clearFirst: clearFirst);
+  void writeln(String s, {bool clearFirst = false, bool flush = false}) =>
+      File(this).writeln(s, clearFirst: clearFirst, flush: flush);
+
+  void flush() => File(this).flush();
 
   List<String> find(String glob) =>
       Directory(this).find(glob).map((e) => e.path).toList();
 
-  IOSink get out => File(this).out;
+  IOSink get async => File(this).async;
 
   bool touch() {
     final file = File(this);
@@ -230,23 +232,27 @@ extension FileExt on File {
     _getReal(this).writeAsStringSync('', flush: true);
   }
 
-  void write(String s, {bool clearFirst = false}) {
+  void write(String s, {bool clearFirst = false, bool flush = false}) {
     _getReal(this).writeAsStringSync(
       s,
       mode: clearFirst ? FileMode.write : FileMode.append,
-      flush: true,
+      flush: flush,
     );
   }
 
-  void writeln(String s, {bool clearFirst = false}) {
+  void writeln(String s, {bool clearFirst = false, bool flush = false}) {
     _getReal(this).writeAsStringSync(
       '$s$_lineTerminator',
       mode: clearFirst ? FileMode.write : FileMode.append,
-      flush: true,
+      flush: flush,
     );
   }
 
-  IOSink get out {
+  void flush() {
+    _getReal(this).writeAsStringSync('', mode: FileMode.append, flush: true);
+  }
+
+  IOSink get async {
     final file = _getReal(this);
     final path = absolute(file.path);
     var sink = _sinks[path];
