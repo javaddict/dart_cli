@@ -174,7 +174,15 @@ bool touch(String path) {
   return path.touch();
 }
 
+final Map<String, File> _realFileCache = {};
+
 File _getReal(File file) {
+  final cacheKey = file.path;
+  final cached = _realFileCache[cacheKey];
+  if (cached != null) {
+    return cached;
+  }
+
   final type = FileSystemEntity.typeSync(file.path);
   final File real;
   switch (type) {
@@ -195,6 +203,7 @@ File _getReal(File file) {
       throw UnsupportedError('Unsupported file system entity type: $type');
   }
   real.parent.createSync(recursive: true);
+  _realFileCache[cacheKey] = real;
   return real;
 }
 
