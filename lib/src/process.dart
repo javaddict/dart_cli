@@ -282,16 +282,16 @@ extension ProcessResultExt on ProcessResult {
       return [];
     }
     var s = this.stdout as String;
-    if (s.endsWith('\n')) {
-      s = s.substring(0, s.length - 1);
+    if (s.endsWith(Platform.isWindows ? '\r\n' : '\n')) {
+      s = s.substring(0, s.length - (Platform.isWindows ? 2 : 1));
     }
     return s.isEmpty ? [] : (s.split(_lineTerminatorRegExp));
   }
 
   List<String> get errors {
     var s = this.stderr as String;
-    if (s.endsWith('\n')) {
-      s = s.substring(0, s.length - 1);
+    if (s.endsWith(Platform.isWindows ? '\r\n' : '\n')) {
+      s = s.substring(0, s.length - (Platform.isWindows ? 2 : 1));
     }
     return s.isEmpty ? [] : (s.split(_lineTerminatorRegExp));
   }
