@@ -177,19 +177,13 @@ extension CommandParts on List<String> {
     return ProcessResult(p.pid, exitCode, outBuf.toString(), errBuf.toString());
   }
 
-  String concatenate() {
-    String quoteIfNecessary(String part) =>
-        part.contains(' ') ? '"${part.replaceAll('"', '\\"')}"' : part;
-
-    final sb = StringBuffer();
-    for (var i = 0; i < length; i++) {
-      if (i > 0) {
-        sb.write(' ');
-      }
-      sb.write(quoteIfNecessary(this[i]));
-    }
-    return sb.toString();
-  }
+  String concatenate() => map(
+    (part) => part.contains(' ')
+        ? '"${part.replaceAll('"', Platform.isWindows ? '""' : r'\"')}"'
+        : Platform.isWindows
+        ? part
+        : part.replaceAll(r'\', r'\\'),
+  ).join(' ');
 }
 
 extension Command on String {
@@ -249,27 +243,76 @@ extension Command on String {
   }
 
   List<String> separate() {
-    final list = <String>[];
-    String? quote;
-    var i = 0;
-    int j;
-    for (j = 0; j < length; j++) {
-      final c = this[j];
-      if (c == '\\') {
-        j++;
-      } else if (quote == null && (c == '\'' || c == '"')) {
-        quote = c;
-      } else if (c == quote) {
-        quote = null;
-      } else if (c == ' ') {
-        if (quote == null) {
-          list.add(substring(i, j));
-          i = j + 1;
+    List<String> list = [];
+    final sb = StringBuffer();
+    String? inQuote;
+    var index = 0;
+
+    void add(String c) {
+      if (c == ' ' && inQuote == null) {
+        if (sb.isNotEmpty) {
+          list.add(sb.toString());
+          sb.clear();
+        }
+      } else {
+        sb.write(c);
+      }
+    }
+
+    String? peek() {
+      if (index < length) {
+        return this[index];
+      }
+      return null;
+    }
+
+    String? next() {
+      if (index >= length) {
+        return null;
+      }
+      final c = this[index++];
+      if (c == r'\' && inQuote == null && !Platform.isWindows) {
+        if (peek() == r'\') {
+          index++;
+          return r'\';
+        } else {
+          // Single backslash (\) is used to connect lines, which is ignored here.
+          return next();
+        }
+      } else {
+        return c;
+      }
+    }
+
+    while (true) {
+      final c = next();
+      if (c == null) {
+        break;
+      }
+      if (inQuote == null) {
+        if (c == '\'' || c == '"') {
+          inQuote = c;
+        } else {
+          add(c);
+        }
+      } else {
+        if (c == inQuote) {
+          inQuote = null;
+          list.add(sb.toString());
+          sb.clear();
+        } else {
+          if (c == r'\' && peek() == '"' && inQuote == '"') {
+            index++;
+            add('"');
+          } else {
+            add(c);
         }
       }
     }
-    list.add(substring(i, j));
-    list.retainWhere((s) => s.isNotEmpty);
+    }
+    if (sb.isNotEmpty) {
+      list.add(sb.toString());
+    }
     return list;
   }
 }
