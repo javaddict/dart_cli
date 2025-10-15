@@ -191,20 +191,16 @@ extension Command on String {
     String? at,
     bool showCommand = true,
     bool showMessages = true,
+    bool runInShell = false,
   }) {
     if (!forceSilent && showCommand) {
       stdout.writeln(this);
     }
-    return [
-      // We don't use cmd.exe in MSYS2.
-      env['SHELL'] ?? 'cmd.exe',
-      env['SHELL'] != null ? '-c' : '/c',
-      this,
-    ].run(
+    return separate().run(
       at: at,
       showCommand: false,
       showMessages: showMessages,
-      runInShell: false,
+      runInShell: runInShell,
     );
   }
 
@@ -221,22 +217,18 @@ extension Command on String {
     ),
     List<String> input = const [],
     bool interactive = false,
+    bool runInShell = false,
   }) {
     if (!forceSilent && showCommand) {
       stdout.writeln(this);
     }
-    return [
-      // We don't use cmd.exe in MSYS2.
-      env['SHELL'] ?? 'cmd.exe',
-      env['SHELL'] != null ? '-c' : '/c',
-      this,
-    ].running(
+    return separate().running(
       at: at,
       showCommand: false,
       showMessages: showMessages,
       saveMessages: saveMessages,
       redirectMessages: redirectMessages,
-      runInShell: false,
+      runInShell: runInShell,
       input: input,
       interactive: interactive,
     );
