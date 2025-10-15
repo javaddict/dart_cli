@@ -68,12 +68,25 @@ extension CommandParts on List<String> {
     if (!forceSilent && showCommand) {
       stdout.writeln(concatenate());
     }
+    var cmd = this;
+    if (runInShell) {
+      // due to the bug of [runInShell] in [Process.runSync]
+      cmd = [];
+      if (Platform.isWindows) {
+        cmd.add(env['COMSPEC']!);
+        cmd.add('/c');
+      } else {
+        cmd.add(env['SHELL']!);
+        cmd.add('-c');
+      }
+      cmd.add(concatenate());
+    }
     final r = Process.runSync(
-      this[0],
-      getRange(1, length).toList(),
+      cmd[0],
+      cmd.getRange(1, cmd.length).toList(),
       workingDirectory: at ?? _workingDirectory,
       environment: env._map1,
-      runInShell: runInShell,
+      runInShell: false, // due to the bug of [runInShell] in [Process.runSync]
       stdoutEncoding: runInShell ? systemEncoding : utf8,
       stderrEncoding: runInShell ? systemEncoding : utf8,
     );
@@ -109,12 +122,25 @@ extension CommandParts on List<String> {
     if (!forceSilent && showCommand) {
       stdout.writeln(concatenate());
     }
+    var cmd = this;
+    if (runInShell) {
+      // due to the bug of [runInShell] in [Process.runSync]
+      cmd = [];
+      if (Platform.isWindows) {
+        cmd.add(env['COMSPEC']!);
+        cmd.add('/c');
+      } else {
+        cmd.add(env['SHELL']!);
+        cmd.add('-c');
+      }
+      cmd.add(concatenate());
+    }
     final p = await Process.start(
-      this[0],
-      getRange(1, length).toList(),
+      cmd[0],
+      cmd.getRange(1, cmd.length).toList(),
       workingDirectory: at ?? _workingDirectory,
       environment: env._map1,
-      runInShell: runInShell,
+      runInShell: false, // due to the bug of [runInShell] in [Process.start]
     );
     for (final s in input) {
       p.stdin.writeln(s);
