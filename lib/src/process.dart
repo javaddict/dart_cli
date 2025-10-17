@@ -265,13 +265,15 @@ extension Command on String {
     final sb = StringBuffer();
     String? inQuote;
     var index = 0;
+    bool explicit = false;
 
     void add(String c) {
       if (c == ' ' && inQuote == null) {
-        if (sb.isNotEmpty) {
+        if (sb.isNotEmpty || explicit) {
           list.add(sb.toString());
           sb.clear();
         }
+        explicit = false;
       } else {
         sb.write(c);
       }
@@ -316,19 +318,18 @@ extension Command on String {
       } else {
         if (c == inQuote) {
           inQuote = null;
-          list.add(sb.toString());
-          sb.clear();
+          explicit = true;
         } else {
           if (c == r'\' && peek() == '"' && inQuote == '"') {
             index++;
             add('"');
           } else {
             add(c);
+          }
         }
       }
     }
-    }
-    if (sb.isNotEmpty) {
+    if (sb.isNotEmpty || explicit) {
       list.add(sb.toString());
     }
     return list;
