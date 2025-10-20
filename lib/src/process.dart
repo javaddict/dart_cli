@@ -5,7 +5,9 @@ import 'dart:io';
 import 'package:async/async.dart';
 import 'package:process_run/process_run.dart';
 
-bool forceSilent = false;
+bool defaultShowCommand = true;
+bool defaultShowMessages = true;
+bool defaultRunInShell = false;
 
 class _EnvironmentVariables {
   final Map<String, String> _map0 = Platform.environment;
@@ -59,14 +61,17 @@ Stream<List<int>> _stdin = stdin.asBroadcastStream();
 extension CommandParts on List<String> {
   ProcessResult run({
     String? at,
-    bool showCommand = true,
-    bool showMessages = true,
-    bool runInShell = false,
+    bool? showCommand,
+    bool? showMessages,
+    bool? runInShell,
   }) {
+    showCommand ??= defaultShowCommand;
+    showMessages ??= defaultShowMessages;
+    runInShell ??= defaultRunInShell;
     if (isEmpty) {
       throw ArgumentError('The command can not be empty.');
     }
-    if (!forceSilent && showCommand) {
+    if (showCommand) {
       stdout.writeln(concatenate());
     }
     final List<String> cmd;
@@ -91,13 +96,11 @@ extension CommandParts on List<String> {
       stdoutEncoding: runInShell ? systemEncoding : utf8,
       stderrEncoding: runInShell ? systemEncoding : utf8,
     );
-    if (!forceSilent) {
-      if (showMessages && r.stdout != '') {
-        stdout.writeln(r.stdout);
-      }
-      if (showMessages && r.stderr != '') {
-        stderr.writeln(r.stderr);
-      }
+    if (showMessages && r.stdout != '') {
+      stdout.writeln(r.stdout);
+    }
+    if (showMessages && r.stderr != '') {
+      stderr.writeln(r.stderr);
     }
     return r;
   }
@@ -106,8 +109,8 @@ extension CommandParts on List<String> {
   /// of [main]. (https://github.com/dart-lang/sdk/issues/45098)
   Future<ProcessResult> running({
     String? at,
-    bool showCommand = true,
-    bool showMessages = true,
+    bool? showCommand,
+    bool? showMessages,
     bool saveMessages = false,
     (StreamConsumer<String>?, StreamConsumer<String>?) redirectMessages = (
       null,
@@ -115,12 +118,15 @@ extension CommandParts on List<String> {
     ),
     List<String> input = const [],
     bool interactive = false,
-    bool runInShell = false,
+    bool? runInShell,
   }) async {
+    showCommand ??= defaultShowCommand;
+    showMessages ??= defaultShowMessages;
+    runInShell ??= defaultRunInShell;
     if (isEmpty) {
       throw ArgumentError('The command can not be empty.');
     }
-    if (!forceSilent && showCommand) {
+    if (showCommand) {
       stdout.writeln(concatenate());
     }
     final List<String> cmd;
@@ -157,7 +163,7 @@ extension CommandParts on List<String> {
         runInShell ? systemEncoding.decoder : utf8.decoder,
       );
       if (redirect == null && !saveMessages) {
-        if (!forceSilent && showMessages) {
+        if (showMessages) {
           decodedSrc.listen((s) {
             std.write(s);
           });
@@ -166,7 +172,7 @@ extension CommandParts on List<String> {
         }
       } else {
         var s0 = decodedSrc;
-        if (!forceSilent && showMessages) {
+        if (showMessages) {
           final [s00, s01] = StreamSplitter.splitFrom(s0);
           s00.listen((s) {
             std.write(s);
@@ -210,11 +216,14 @@ extension CommandParts on List<String> {
 extension Command on String {
   ProcessResult run({
     String? at,
-    bool showCommand = true,
-    bool showMessages = true,
-    bool runInShell = false,
+    bool? showCommand,
+    bool? showMessages,
+    bool? runInShell,
   }) {
-    if (!forceSilent && showCommand) {
+    showCommand ??= defaultShowCommand;
+    showMessages ??= defaultShowMessages;
+    runInShell ??= defaultRunInShell;
+    if (showCommand) {
       stdout.writeln(this);
     }
     final List<String> cmd;
@@ -242,8 +251,8 @@ extension Command on String {
   /// of [main]. (https://github.com/dart-lang/sdk/issues/45098)
   Future<ProcessResult> running({
     String? at,
-    bool showCommand = true,
-    bool showMessages = true,
+    bool? showCommand,
+    bool? showMessages,
     bool saveMessages = false,
     (StreamConsumer<String>?, StreamConsumer<String>?) redirectMessages = (
       null,
@@ -251,9 +260,12 @@ extension Command on String {
     ),
     List<String> input = const [],
     bool interactive = false,
-    bool runInShell = false,
+    bool? runInShell,
   }) {
-    if (!forceSilent && showCommand) {
+    showCommand ??= defaultShowCommand;
+    showMessages ??= defaultShowMessages;
+    runInShell ??= defaultRunInShell;
+    if (showCommand) {
       stdout.writeln(this);
     }
     final List<String> cmd;
