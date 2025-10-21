@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:async/async.dart';
+import 'package:process_run/process_run.dart';
 
 bool forceSilent = false;
 
@@ -68,12 +69,25 @@ extension CommandParts on List<String> {
     if (!forceSilent && showCommand) {
       stdout.writeln(concatenate());
     }
+    final List<String> cmd;
+    if (runInShell) {
+      // due to the bug of [runInShell] in [Process.runSync]
+      cmd = [env['SHELL'] ?? env['COMSPEC'] ?? '/bin/sh'];
+      if (cmd[0].contains('cmd.exe')) {
+        cmd.add('/c');
+      } else {
+        cmd.add('-c');
+      }
+      cmd.add(concatenate());
+    } else {
+      cmd = this;
+    }
     final r = Process.runSync(
-      this[0],
-      getRange(1, length).toList(),
+      cmd[0],
+      cmd.getRange(1, cmd.length).toList(),
       workingDirectory: at ?? _workingDirectory,
       environment: env._map1,
-      runInShell: runInShell,
+      runInShell: false,
       stdoutEncoding: runInShell ? systemEncoding : utf8,
       stderrEncoding: runInShell ? systemEncoding : utf8,
     );
@@ -99,9 +113,9 @@ extension CommandParts on List<String> {
       null,
       null,
     ),
-    bool runInShell = false,
     List<String> input = const [],
     bool interactive = false,
+    bool runInShell = false,
   }) async {
     if (isEmpty) {
       throw ArgumentError('The command can not be empty.');
@@ -109,12 +123,25 @@ extension CommandParts on List<String> {
     if (!forceSilent && showCommand) {
       stdout.writeln(concatenate());
     }
+    final List<String> cmd;
+    if (runInShell) {
+      // due to the bug of [runInShell] in [Process.runSync]
+      cmd = [env['SHELL'] ?? env['COMSPEC'] ?? '/bin/sh'];
+      if (cmd[0].contains('cmd.exe')) {
+        cmd.add('/c');
+      } else {
+        cmd.add('-c');
+      }
+      cmd.add(concatenate());
+    } else {
+      cmd = this;
+    }
     final p = await Process.start(
-      this[0],
-      getRange(1, length).toList(),
+      cmd[0],
+      cmd.getRange(1, cmd.length).toList(),
       workingDirectory: at ?? _workingDirectory,
       environment: env._map1,
-      runInShell: runInShell,
+      runInShell: false,
     );
     for (final s in input) {
       p.stdin.writeln(s);
@@ -177,19 +204,7 @@ extension CommandParts on List<String> {
     return ProcessResult(p.pid, exitCode, outBuf.toString(), errBuf.toString());
   }
 
-  String concatenate() {
-    String quoteIfNecessary(String part) =>
-        part.contains(' ') ? '"${part.replaceAll('"', '\\"')}"' : part;
-
-    final sb = StringBuffer();
-    for (var i = 0; i < length; i++) {
-      if (i > 0) {
-        sb.write(' ');
-      }
-      sb.write(quoteIfNecessary(this[i]));
-    }
-    return sb.toString();
-  }
+  String concatenate() => argumentsToString(this);
 }
 
 extension Command on String {
@@ -197,16 +212,25 @@ extension Command on String {
     String? at,
     bool showCommand = true,
     bool showMessages = true,
+    bool runInShell = false,
   }) {
     if (!forceSilent && showCommand) {
       stdout.writeln(this);
     }
-    return [
-      // We don't use cmd.exe in MSYS2.
-      env['SHELL'] ?? 'cmd.exe',
-      env['SHELL'] != null ? '-c' : '/c',
-      this,
-    ].run(
+    final List<String> cmd;
+    if (runInShell) {
+      // due to the bug of [runInShell] in [Process.runSync]
+      cmd = [env['SHELL'] ?? env['COMSPEC'] ?? '/bin/sh'];
+      if (cmd[0].contains('cmd.exe')) {
+        cmd.add('/c');
+      } else {
+        cmd.add('-c');
+      }
+      cmd.add(this);
+    } else {
+      cmd = separate();
+    }
+    return cmd.run(
       at: at,
       showCommand: false,
       showMessages: showMessages,
@@ -227,51 +251,37 @@ extension Command on String {
     ),
     List<String> input = const [],
     bool interactive = false,
+    bool runInShell = false,
   }) {
     if (!forceSilent && showCommand) {
       stdout.writeln(this);
     }
-    return [
-      // We don't use cmd.exe in MSYS2.
-      env['SHELL'] ?? 'cmd.exe',
-      env['SHELL'] != null ? '-c' : '/c',
-      this,
-    ].running(
+    final List<String> cmd;
+    if (runInShell) {
+      // due to the bug of [runInShell] in [Process.runSync]
+      cmd = [env['SHELL'] ?? env['COMSPEC'] ?? '/bin/sh'];
+      if (cmd[0].contains('cmd.exe')) {
+        cmd.add('/c');
+      } else {
+        cmd.add('-c');
+      }
+      cmd.add(this);
+    } else {
+      cmd = separate();
+    }
+    return cmd.running(
       at: at,
       showCommand: false,
       showMessages: showMessages,
       saveMessages: saveMessages,
       redirectMessages: redirectMessages,
-      runInShell: false,
       input: input,
       interactive: interactive,
+      runInShell: false,
     );
   }
 
-  List<String> separate() {
-    final list = <String>[];
-    String? quote;
-    var i = 0;
-    int j;
-    for (j = 0; j < length; j++) {
-      final c = this[j];
-      if (c == '\\') {
-        j++;
-      } else if (quote == null && (c == '\'' || c == '"')) {
-        quote = c;
-      } else if (c == quote) {
-        quote = null;
-      } else if (c == ' ') {
-        if (quote == null) {
-          list.add(substring(i, j));
-          i = j + 1;
-        }
-      }
-    }
-    list.add(substring(i, j));
-    list.retainWhere((s) => s.isNotEmpty);
-    return list;
-  }
+  List<String> separate() => stringToArguments(this);
 }
 
 final _lineTerminatorRegExp = RegExp('(?:\n|\r\n)');

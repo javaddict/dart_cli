@@ -10,6 +10,7 @@ dependencies:
   dart_console:
   glob:
   path:
+  process_run:
   uuid:
 
 dev_dependencies:
