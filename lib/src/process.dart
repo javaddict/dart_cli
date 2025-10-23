@@ -80,10 +80,11 @@ extension CommandParts on List<String> {
       cmd = [env['SHELL'] ?? env['COMSPEC'] ?? '/bin/sh'];
       if (cmd[0].contains('cmd.exe')) {
         cmd.add('/c');
+        cmd.add(concatenate());
       } else {
         cmd.add('-c');
+        cmd.add(map((s) => "'${s.replaceAll("'", "'\"'\"'")}'").join(' '));
       }
-      cmd.add(concatenate());
     } else {
       cmd = this;
     }
@@ -135,10 +136,11 @@ extension CommandParts on List<String> {
       cmd = [env['SHELL'] ?? env['COMSPEC'] ?? '/bin/sh'];
       if (cmd[0].contains('cmd.exe')) {
         cmd.add('/c');
+        cmd.add(concatenate());
       } else {
         cmd.add('-c');
+        cmd.add(map((s) => "'${s.replaceAll("'", "'\"'\"'")}'").join(' '));
       }
-      cmd.add(concatenate());
     } else {
       cmd = this;
     }
