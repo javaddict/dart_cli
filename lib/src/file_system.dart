@@ -5,6 +5,9 @@ import 'package:path/path.dart';
 
 import 'process.dart';
 
+// Cache for _safePath conversions
+final _safePathCache = <String, String>{};
+
 // In MSYS2, we use '\n' as the line terminator.
 final _lineTerminator = Platform.isWindows && env['SHELL'] != null
     ? '\n'
@@ -24,39 +27,39 @@ final _lineTerminator = Platform.isWindows && env['SHELL'] != null
 }
 
 extension Path on String {
-  bool isDirectory() => FileSystemEntity.isDirectorySync(this);
+  bool isDirectory() => FileSystemEntity.isDirectorySync(_safePath);
 
-  bool isFile() => FileSystemEntity.isFileSync(this);
+  bool isFile() => FileSystemEntity.isFileSync(_safePath);
 
-  bool isLink() => FileSystemEntity.isLinkSync(this);
+  bool isLink() => FileSystemEntity.isLinkSync(_safePath);
 
   bool exists() =>
-      FileSystemEntity.typeSync(this) != FileSystemEntityType.notFound;
+      FileSystemEntity.typeSync(_safePath) != FileSystemEntityType.notFound;
 
   void delete() {
     // deleteSync() throws an exception if the file does not exist.
     if (exists()) {
       // [deleteSync] works on all [FileSystemEntity] types when [recursive] is true.
-      File(this).deleteSync(recursive: true);
+      File(_safePath).deleteSync(recursive: true);
     }
   }
 
-  List<String> readLines() => File(this).readAsLinesSync();
+  List<String> readLines() => File(_safePath).readAsLinesSync();
 
   void copyTo(String path) {
-    final type = FileSystemEntity.typeSync(this);
+    final type = FileSystemEntity.typeSync(_safePath);
     switch (type) {
       case FileSystemEntityType.file:
-        File(this).copyTo(File(path), checked: true);
+        File(_safePath).copyTo(File(path), checked: true);
       case FileSystemEntityType.link:
-        final (target, type) = _resolve(Link(this));
+        final (target, type) = _resolve(Link(_safePath));
         if (target is File && type != FileSystemEntityType.notFound) {
           target.copyTo(File(path), checked: true);
         } else if (target is Directory) {
           target.copyTo(Directory(path), checked: true);
         }
       case FileSystemEntityType.directory:
-        Directory(this).copyTo(Directory(path), checked: true);
+        Directory(_safePath).copyTo(Directory(path), checked: true);
       case FileSystemEntityType.notFound:
         throw FileSystemException('File or directory not found', this);
       default:
@@ -65,21 +68,21 @@ extension Path on String {
   }
 
   void moveTo(String path) {
-    final type = FileSystemEntity.typeSync(this);
+    final type = FileSystemEntity.typeSync(_safePath);
     switch (type) {
       case FileSystemEntityType.file:
       case FileSystemEntityType.link:
         try {
-          File(this).renameSync(path);
+          File(_safePath).renameSync(path);
         } on FileSystemException {
           copyTo(path);
           delete();
         }
       case FileSystemEntityType.directory:
         try {
-          Directory(this).renameSync(path);
+          Directory(_safePath).renameSync(path);
         } on FileSystemException {
-          Directory(this).copyTo(Directory(path));
+          Directory(_safePath).copyTo(Directory(path));
           delete();
         }
       case FileSystemEntityType.notFound:
@@ -90,34 +93,34 @@ extension Path on String {
   }
 
   void clear() {
-    final type = FileSystemEntity.typeSync(this);
+    final type = FileSystemEntity.typeSync(_safePath);
     switch (type) {
       case FileSystemEntityType.file:
       case FileSystemEntityType.link:
       case FileSystemEntityType.notFound:
-        File(this).clear();
+        File(_safePath).clear();
       case FileSystemEntityType.directory:
-        Directory(this).clear();
+        Directory(_safePath).clear();
       default:
         throw UnsupportedError('Unsupported file system entity type: $type');
     }
   }
 
   void write(String s, {bool clearFirst = false, bool flush = false}) =>
-      File(this).write(s, clearFirst: clearFirst, flush: flush);
+      File(_safePath).write(s, clearFirst: clearFirst, flush: flush);
 
   void writeln(String s, {bool clearFirst = false, bool flush = false}) =>
-      File(this).writeln(s, clearFirst: clearFirst, flush: flush);
+      File(_safePath).writeln(s, clearFirst: clearFirst, flush: flush);
 
-  void flush() => File(this).flush();
+  void flush() => File(_safePath).flush();
 
   List<String> find(String glob) =>
-      Directory(this).find(glob).map((e) => e.path).toList();
+      Directory(_safePath).find(glob).map((e) => e.path).toList();
 
-  IOSink get async => File(this).async;
+  IOSink get async => File(_safePath).async;
 
   bool touch() {
-    final file = File(this);
+    final file = File(_safePath);
     if (Platform.isWindows) {
       try {
         if (file.existsSync()) {
@@ -139,21 +142,51 @@ extension Path on String {
     }
   }
 
-  DateTime get lastModified => File(this).lastModifiedSync();
+  DateTime get lastModified => File(_safePath).lastModifiedSync();
 
   bool isNewerThan(String other) => lastModified.isAfter(other.lastModified);
 
   bool isOlderThan(String other) => lastModified.isBefore(other.lastModified);
 
   void create() {
-    File(this).createSync(recursive: true);
+    File(_safePath).createSync(recursive: true);
   }
 
   void createDir() {
-    Directory(this).createSync(recursive: true);
+    Directory(_safePath).createSync(recursive: true);
   }
 
-  String get parent => dirname(this);
+  String get parent => dirname(_safePath);
+
+  String get _safePath {
+    if (Platform.isWindows && env['SHELL'] != null) {
+      // Check cache first
+      final cached = _safePathCache[this];
+      if (cached != null) {
+        return cached;
+      }
+
+      var path = this;
+      if (path[0] == '~') {
+        path = '\$HOME${path.substring(1)}';
+      }
+      path =
+          'cygpath -w "$path" ' // The space at the end is crucial for this to work on file paths. I don't know why.
+              .run(showCommand: false, showMessages: false, runInShell: true)
+              .output;
+
+      // Cache the result
+      _safePathCache[this] = path;
+      return path;
+    } else {
+      return this;
+    }
+  }
+
+  String get evaluate {
+    _safePathCache.remove(this);
+    return _safePath;
+  }
 }
 
 // Also good for tear-off
