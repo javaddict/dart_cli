@@ -34,6 +34,10 @@ String get scriptPath {
 
 final pwd = Directory.current.path;
 
+final home = env['HOME'] ?? env['USERPROFILE'] ?? '';
+
+final inMsys2 = Platform.isWindows && env['SHELL'] != null;
+
 final _cachedRegExps = <String, RegExp>{};
 
 RegExp getRegExp(String pattern) {

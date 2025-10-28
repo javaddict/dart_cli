@@ -3,15 +3,11 @@ import 'dart:io';
 import 'package:glob/glob.dart';
 import 'package:path/path.dart';
 
+import 'misc.dart';
 import 'process.dart';
 
 // Cache for _safePath conversions
 final _safePathCache = <String, String>{};
-
-// In MSYS2, we use '\n' as the line terminator.
-final _lineTerminator = Platform.isWindows && env['SHELL'] != null
-    ? '\n'
-    : Platform.lineTerminator;
 
 (FileSystemEntity?, FileSystemEntityType) _resolve(Link link) {
   final target = link.resolveSymbolicLinksSync();
@@ -159,7 +155,7 @@ extension Path on String {
   String get parent => dirname(_safePath);
 
   String get _safePath {
-    if (Platform.isWindows && env['SHELL'] != null) {
+    if (inMsys2) {
       // Check cache first
       final cached = _safePathCache[this];
       if (cached != null) {
@@ -275,7 +271,7 @@ extension FileExt on File {
 
   void writeln(String s, {bool clearFirst = false, bool flush = false}) {
     _getReal(this).writeAsStringSync(
-      '$s$_lineTerminator',
+      '$s${inMsys2 ? '\n' : Platform.lineTerminator}', // I guess we will want to use '\n' in MSYS2
       mode: clearFirst ? FileMode.write : FileMode.append,
       flush: flush,
     );
