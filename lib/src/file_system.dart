@@ -338,7 +338,8 @@ extension DirectoryExt on Directory {
         throw UnsupportedError('Unsupported file system entity type: $type');
       }
     }
-    if (!FileSystemEntity.isDirectorySync(directory.path)) {
+    if (directory.existsSync() &&
+        !FileSystemEntity.isDirectorySync(directory.path)) {
       throw FileSystemException('Is not a directory', directory.path);
     }
     _copyDirectory(this, directory, this, keepLinks: keepLinks);
